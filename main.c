@@ -1,4 +1,3 @@
-//Test używania githuba
 #include "supermarket.h"
 #include <string.h>
 
