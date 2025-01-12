@@ -1,6 +1,8 @@
 #include "supermarket.h"
-#include <string.h>
+#include <termios.h>
+#include <unistd.h>
 
+// Deklaracje zmiennych globalnych
 Kasa kasy[MAX_KASY];
 int liczba_czynnych_kas = MIN_CZYNNE_KASY;
 int liczba_klientow = 0;
@@ -21,8 +23,22 @@ void zapis_raportu(int dzien, int zarobki, int klienci, int pozary) {
     close(fd);
 }
 
+// Funkcja obsługi SIGINT
+void sigint_obsluga(int sig) {
+    printf("Przerwanie programu. Zapisuję końcowy raport.\n");
+
+    pthread_mutex_lock(&liczba_klientow_mutex);
+    int klienci_do_raportu = liczba_klientow;
+    pthread_mutex_unlock(&liczba_klientow_mutex);
+
+    zapis_raportu(dzien, zarobki, klienci_do_raportu, pozary);
+    przywroc_tryb_kanoniczny(); // Przywrócenie ustawień terminala
+    exit(0);
+}
+
+// Funkcja symulacji dnia
 void *symulacja_dnia(void *arg) {
-    for (dzien = 1; dzien <= MAX_DNI; dzien++) { //dopytać ile tych dni ma być
+    for (dzien = 1; dzien <= MAX_DNI; dzien++) {
         printf("Dzień %d rozpoczyna się.\n", dzien);
         przyjmowanie_klientow = 1;
 
@@ -43,38 +59,22 @@ void *symulacja_dnia(void *arg) {
         }
 
         printf("Wszyscy klienci zostali obsłużeni. Zapisuję raport.\n");
-        pthread_mutex_lock(&liczba_klientow_mutex);
-        int klienci_do_raportu = liczba_klientow;
-        pthread_mutex_unlock(&liczba_klientow_mutex);
-        zapis_raportu(dzien, zarobki, klienci_do_raportu, pozary);
+        zapis_raportu(dzien, zarobki, liczba_klientow, pozary);
 
-        // Reset danych po zapisaniu raportu, problem-> resetuje się liczba klientów przez używanie jej do kontroli(notatnik)
         zarobki = 0;
         pozary = 0;
     }
     pthread_exit(NULL);
 }
 
-void sigint_obsluga(int sig) {
-    printf("Przerwanie programu. Zapisuję końcowy raport.\n");
-
-    pthread_mutex_lock(&liczba_klientow_mutex);
-    int klienci_do_raportu = liczba_klientow;
-    pthread_mutex_unlock(&liczba_klientow_mutex);
-
-    zapis_raportu(dzien, zarobki, klienci_do_raportu, pozary);
-    exit(0);
-}
-
-
-
-
 int main() {
     srand(time(NULL));
 
     pthread_t kierownik_thread;
     pthread_t dzien_thread;
+    pthread_t klawiatura_thread; // Wątek nasłuchujący klawiatury
 
+    // Inicjalizacja kas
     for (int i = 0; i < MAX_KASY; i++) {
         kasy[i].numer_kasy = i + 1;
         kasy[i].liczba_klientow = 0;
@@ -82,43 +82,48 @@ int main() {
         pthread_mutex_init(&kasy[i].mutex, NULL);
     }
 
-    // Ustawienie obsługi sygnału pożaru, coś nie działa dobrze jeszcze
-    struct sigaction sa;
-    sa.sa_handler = strazak_obsluga;
-    sigaction(SIGUSR1, &sa, NULL);
+    // Ustawienie trybu niekanonicznego
+    ustaw_tryb_niekanoniczny();
 
+    // Ustawienie obsługi sygnału SIGINT
+    struct sigaction sa;
     sa.sa_handler = sigint_obsluga;
     sigaction(SIGINT, &sa, NULL);
 
-
-    // Uruchomienie wątku kierownika i symulacji dnia
+    // Uruchomienie wątków
     pthread_create(&kierownik_thread, NULL, kierownik_zarzadzanie, NULL);
     pthread_create(&dzien_thread, NULL, symulacja_dnia, NULL);
+    pthread_create(&klawiatura_thread, NULL, nasluch_klawiatury, NULL);
 
     // Tworzenie klientów
     int id_klienta = 0;
     while (dzien <= MAX_DNI) {
         if (!przyjmowanie_klientow) {
-        sleep(1); // Oczekiwanie, aż przyjmowanie klientów zostanie wznowione
-        continue;
+            sleep(1);
+            continue;
+        }
+
+        Klient *klient = malloc(sizeof(Klient));
+        klient->id_klienta = ++id_klienta;
+        klient->czas_w_sklepie = rand() % 10 + 1;
+        klient->wydatki = rand() % 1000 + 1;
+
+        pthread_t klient_thread;
+        pthread_create(&klient_thread, NULL, klient_zachowanie, klient);
+        pthread_detach(klient_thread);
+
+        sleep(rand() % 2);
     }
 
-    Klient *klient = malloc(sizeof(Klient));
-    klient->id_klienta = ++id_klienta;
-    klient->czas_w_sklepie = rand() % 10 + 1;
-    klient->wydatki = rand() % 1000 + 1;
-
-    pthread_t klient_thread;
-    pthread_create(&klient_thread, NULL, klient_zachowanie, klient);
-    pthread_detach(klient_thread); // Umożliwia automatyczne zwolnienie zasobów po zakończeniu wątku klienta
-
-
-    sleep(rand() % 2); // Klienci przychodzą losowo
-}
-
+    // Czekanie na zakończenie wątku dnia
     pthread_join(dzien_thread, NULL);
     pthread_cancel(kierownik_thread);
+    pthread_cancel(klawiatura_thread);
 
+    // Przywrócenie trybu kanonicznego
+    przywroc_tryb_kanoniczny();
+
+    // Zwalnianie zasobów
     for (int i = 0; i < MAX_KASY; i++) {
         pthread_mutex_destroy(&kasy[i].mutex);
     }
