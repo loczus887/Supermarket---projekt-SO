@@ -5,7 +5,7 @@ Kasa kasy[MAX_KASY];
 int liczba_czynnych_kas = MIN_CZYNNE_KASY;
 int liczba_klientow = 0;
 pthread_mutex_t liczba_klientow_mutex = PTHREAD_MUTEX_INITIALIZER;
-volatile int przyjmowanie_klientow = 1; 
+volatile int przyjmowanie_klientow = 1;
 
 int dzien = 0, pozary = 0, zarobki = 0;
 
@@ -26,7 +26,7 @@ void *symulacja_dnia(void *arg) {
         printf("Dzień %d rozpoczyna się.\n", dzien);
         przyjmowanie_klientow = 1;
 
-        sleep(10); // Czas trwania dnia
+        sleep(120); // Czas trwania dnia
 
         printf("Dzień %d zakończony.\n", dzien);
         przyjmowanie_klientow = 0;
@@ -39,7 +39,7 @@ void *symulacja_dnia(void *arg) {
                 break;
             }
             pthread_mutex_unlock(&liczba_klientow_mutex);
-            sleep(1); 
+            sleep(1);
         }
 
         printf("Wszyscy klienci zostali obsłużeni. Zapisuję raport.\n");
@@ -54,6 +54,18 @@ void *symulacja_dnia(void *arg) {
     }
     pthread_exit(NULL);
 }
+
+void sigint_obsluga(int sig) {
+    printf("Przerwanie programu. Zapisuję końcowy raport.\n");
+
+    pthread_mutex_lock(&liczba_klientow_mutex);
+    int klienci_do_raportu = liczba_klientow;
+    pthread_mutex_unlock(&liczba_klientow_mutex);
+
+    zapis_raportu(dzien, zarobki, klienci_do_raportu, pozary);
+    exit(0);
+}
+
 
 
 
@@ -75,6 +87,10 @@ int main() {
     sa.sa_handler = strazak_obsluga;
     sigaction(SIGUSR1, &sa, NULL);
 
+    sa.sa_handler = sigint_obsluga;
+    sigaction(SIGINT, &sa, NULL);
+
+
     // Uruchomienie wątku kierownika i symulacji dnia
     pthread_create(&kierownik_thread, NULL, kierownik_zarzadzanie, NULL);
     pthread_create(&dzien_thread, NULL, symulacja_dnia, NULL);
@@ -95,6 +111,7 @@ int main() {
     pthread_t klient_thread;
     pthread_create(&klient_thread, NULL, klient_zachowanie, klient);
     pthread_detach(klient_thread); // Umożliwia automatyczne zwolnienie zasobów po zakończeniu wątku klienta
+
 
     sleep(rand() % 2); // Klienci przychodzą losowo
 }
