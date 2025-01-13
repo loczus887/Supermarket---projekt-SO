@@ -21,9 +21,9 @@
 // Stałe
 #define MAX_KASY 10
 #define MAX_KLIENCI 10000
-#define CZAS_OBSLUGI 3
+#define CZAS_OBSLUGI 1
 #define MIN_CZYNNE_KASY 2
-#define KLIENT_PER_KASA 2
+#define KLIENT_PER_KASA 5
 #define MAX_DNI 7
 
 // Struktura dla kasy
@@ -46,5 +46,6 @@ void *kierownik_zarzadzanie(void *arg);
 void *klient_zachowanie(void *arg);
 void strazak_obsluga(int sig);
 void zapis_raportu(int dzien, int zarobki, int klienci, int pozary);
+void sigint_obsluga(int sig);
 
 #endif
