@@ -9,17 +9,66 @@ int liczba_klientow = 0;
 pthread_mutex_t liczba_klientow_mutex = PTHREAD_MUTEX_INITIALIZER;
 volatile int przyjmowanie_klientow = 1;
 
-int dzien = 0, pozary = 0, zarobki = 0;
+int dzien = 0, zarobki = 0;
 
-void zapis_raportu(int dzien, int zarobki, int klienci, int pozary) {
+// Funkcja do ustawienia trybu niekanonicznego
+void ustaw_tryb_niekanoniczny() {
+    struct termios t;
+    tcgetattr(STDIN_FILENO, &t);
+    t.c_lflag &= ~(ICANON | ECHO); // Wyłącza tryb kanoniczny i echo
+    tcsetattr(STDIN_FILENO, TCSANOW, &t);
+}
+
+// Funkcja do przywrócenia trybu kanonicznego
+void przywroc_tryb_kanoniczny() {
+    struct termios t;
+    tcgetattr(STDIN_FILENO, &t);
+    t.c_lflag |= (ICANON | ECHO); // Włącza tryb kanoniczny i echo
+    tcsetattr(STDIN_FILENO, TCSANOW, &t);
+}
+
+// Funkcja nasłuchująca klawiaturę
+void *nasluch_klawiatury(void *arg) {
+    char c;
+    while (1) {
+        c = getchar(); // Oczekuje na wpisanie znaku
+        if (c == 's') {
+            strazak_obsluga(0); // Wywołuje funkcję obsługi pożaru
+        }
+    }
+    return NULL;
+}
+
+// Funkcja zapisująca raport
+void zapis_raportu(int dzien, Kasa kasy[], int liczba_kas) {
     int fd = open("raport.txt", O_WRONLY | O_CREAT | O_APPEND, 0644);
     if (fd == -1) {
         perror("Nie można otworzyć pliku raport.txt");
         return;
     }
-    char buffer[256];
-    snprintf(buffer, sizeof(buffer), "Dzień %d: Zarobki: %d zł, Klienci: %d, Pożary: %d\n", dzien, zarobki, klienci, pozary);
+
+    char buffer[512];
+    int total_klienci = 0, total_zarobki = 0;
+
+    snprintf(buffer, sizeof(buffer), "Dzień %d:\n", dzien);
     write(fd, buffer, strlen(buffer));
+
+    for (int i = 0; i < liczba_kas; i++) {
+        pthread_mutex_lock(&kasy[i].mutex);
+        snprintf(buffer, sizeof(buffer),
+                 "Kasa %d: Klienci: %d, Zarobki: %d zł\n",
+                 kasy[i].numer_kasy, kasy[i].liczba_klientow, kasy[i].zarobek);
+        total_klienci += kasy[i].liczba_klientow;
+        total_zarobki += kasy[i].zarobek;
+        pthread_mutex_unlock(&kasy[i].mutex);
+        write(fd, buffer, strlen(buffer));
+    }
+
+    snprintf(buffer, sizeof(buffer),
+             "Podsumowanie dnia %d: Klienci: %d, Zarobki: %d zł\n\n",
+             dzien, total_klienci, total_zarobki);
+    write(fd, buffer, strlen(buffer));
+
     close(fd);
 }
 
@@ -31,7 +80,7 @@ void sigint_obsluga(int sig) {
     int klienci_do_raportu = liczba_klientow;
     pthread_mutex_unlock(&liczba_klientow_mutex);
 
-    zapis_raportu(dzien, zarobki, klienci_do_raportu, pozary);
+    zapis_raportu(dzien, kasy, MAX_KASY);
     przywroc_tryb_kanoniczny(); // Przywrócenie ustawień terminala
     exit(0);
 }
@@ -40,12 +89,14 @@ void sigint_obsluga(int sig) {
 void *symulacja_dnia(void *arg) {
     for (dzien = 1; dzien <= MAX_DNI; dzien++) {
         printf("Dzień %d rozpoczyna się.\n", dzien);
+         liczba_czynnych_kas = MIN_CZYNNE_KASY;
         przyjmowanie_klientow = 1;
 
-        sleep(120); // Czas trwania dnia
+        sleep(1); // Czas trwania dnia
 
         printf("Dzień %d zakończony.\n", dzien);
         przyjmowanie_klientow = 0;
+
 
         printf("Koniec dnia %d. Czekam na obsłużenie wszystkich klientów.\n", dzien);
         while (1) {
@@ -57,12 +108,13 @@ void *symulacja_dnia(void *arg) {
             pthread_mutex_unlock(&liczba_klientow_mutex);
             sleep(1);
         }
+        liczba_czynnych_kas = 0;
 
         printf("Wszyscy klienci zostali obsłużeni. Zapisuję raport.\n");
-        zapis_raportu(dzien, zarobki, liczba_klientow, pozary);
+        zapis_raportu(dzien, kasy, MAX_KASY);
 
         zarobki = 0;
-        pozary = 0;
+        sleep(1);
     }
     pthread_exit(NULL);
 }
@@ -104,6 +156,10 @@ int main() {
         }
 
         Klient *klient = malloc(sizeof(Klient));
+        if (klient == NULL) {
+    fprintf(stderr, "Błąd alokacji pamięci dla klienta\n");
+    exit(1);
+}
         klient->id_klienta = ++id_klienta;
         klient->czas_w_sklepie = rand() % 10 + 1;
         klient->wydatki = rand() % 1000 + 1;
@@ -112,7 +168,7 @@ int main() {
         pthread_create(&klient_thread, NULL, klient_zachowanie, klient);
         pthread_detach(klient_thread);
 
-        sleep(rand() % 2);
+        usleep(rand() % 9000);  // losowe opóźnienie między 0 a 9000 mikrosekund
     }
 
     // Czekanie na zakończenie wątku dnia
