@@ -1,17 +1,18 @@
 #include "supermarket.h"
 
-extern Kasa kasy[MAX_KASY];
-extern int liczba_czynnych_kas;
-
 void strazak_obsluga(int sig) {
-    printf("Pożar! Klienci opuszczają supermarket.\n");
+    key_t key = ftok("supermarket", 65);
+    int msgid = msgget(key, 0666 | IPC_CREAT);
 
-    for (int i = 0; i < liczba_czynnych_kas; i++) {
-        pthread_mutex_lock(&kasy[i].mutex);
-        kasy[i].liczba_klientow = 0;
-        pthread_mutex_unlock(&kasy[i].mutex);
-    }
-
-    liczba_czynnych_kas = 0;
+    printf("Strażak: Pożar! Zamykam supermarket.\n");
+    msgctl(msgid, IPC_RMID, NULL);    //Usuwanie kolejki komunikatów
     exit(0);
+}
+
+int main() {
+    signal(SIGINT, strazak_obsluga);
+    while (1) {
+        pause();
+    }
+    return 0;
 }
