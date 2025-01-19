@@ -8,44 +8,24 @@
 #include <signal.h>
 #include <sys/types.h>
 #include <sys/ipc.h>
-#include <sys/shm.h>
-#include <sys/sem.h>
 #include <sys/msg.h>
-#include <sys/socket.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <time.h>
-#include <stddef.h>
 #include <string.h>
 
-// Stałe
-#define MAX_KASY 10
-#define MAX_KLIENCI 10000
-#define CZAS_OBSLUGI 1
-#define MIN_CZYNNE_KASY 2
-#define KLIENT_PER_KASA 5
-#define MAX_DNI 7
+#define MAX_KASY 10           //Maksymalna liczba kas
+#define MIN_CZYNNE_KASY 2     //Minimalna liczba otwartych kas
+#define KLIENT_PER_KASA 5     //Liczba klientów przypadająca na jedną kasę
+#define MSG_SZ 256            //Rozmiar komunikatu
+#define MSG_TYPE_KLIENT 1     //Typ komunikatu dla klientów
+#define MSG_TYPE_KIEROWNIK 2  //Typ komunikatu dla kierownika
 
-// Struktura dla kasy
 typedef struct {
-    int numer_kasy;
-    int liczba_klientow;
-    int zarobek;
-    pthread_mutex_t mutex;
-} Kasa;
-
-// Struktura dla klienta
-typedef struct {
-    int id_klienta;
-    int czas_w_sklepie;
-    int wydatki;
-} Klient;
-
-// Prototypy funkcji
-void *kierownik_zarzadzanie(void *arg);
-void *klient_zachowanie(void *arg);
-void strazak_obsluga(int sig);
-void zapis_raportu(int dzien, int zarobki, int klienci, int pozary);
-void sigint_obsluga(int sig);
+    long mtype;               //Typ komunikatu (1 dla klientów, 2 dla kierownika)
+    int liczba_klientow;      //Zmiana liczby klientów (dla kierownika)
+    int kasa;                 //Numer wybranej kasy (dla klienta)
+    int wydatki;              //Wydatki klienta (dla kierownika)
+} Komunikat;
 
 #endif
