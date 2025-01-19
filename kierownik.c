@@ -1,16 +1,19 @@
 #include "supermarket.h"
 
-extern Kasa kasy[MAX_KASY];
-extern int liczba_czynnych_kas;
-extern int liczba_klientow;
+int main() {
+    key_t key = ftok("supermarket", 65);
+    int msgid = msgget(key, 0666 | IPC_CREAT);
 
-void *kierownik_zarzadzanie(void *arg) {
+    int liczba_czynnych_kas = MIN_CZYNNE_KASY;
+    int liczba_klientow = 0;
+
     while (1) {
-        sleep(1);
-        pthread_mutex_lock(&kasy[0].mutex); 
-        if (liczba_klientow > liczba_czynnych_kas) {
-        }
-    
+        Komunikat komunikat;
+        msgrcv(msgid, &komunikat, sizeof(Komunikat) - sizeof(long), MSG_TYPE_KLIENT, 0);
+
+        liczba_klientow += komunikat.liczba_klientow;
+        printf("Kierownik: Liczba klientów = %d\n", liczba_klientow);
+
         if (liczba_klientow > liczba_czynnych_kas * KLIENT_PER_KASA && liczba_czynnych_kas < MAX_KASY) {
             liczba_czynnych_kas++;
             printf("Kierownik: Otwieram kasę %d\n", liczba_czynnych_kas);
@@ -20,7 +23,6 @@ void *kierownik_zarzadzanie(void *arg) {
             printf("Kierownik: Zamykam kasę %d\n", liczba_czynnych_kas);
             liczba_czynnych_kas--;
         }
-        pthread_mutex_unlock(&kasy[0].mutex); 
     }
-    return NULL;
+    return 0;
 }
