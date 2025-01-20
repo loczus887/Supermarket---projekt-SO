@@ -20,6 +20,7 @@
 #define KLIENT_PER_KASA 5     // Liczba klientów przypadająca na jedną kasę
 #define SHM_KEY 12345         // Klucz do pamięci współdzielonej
 #define SEM_KEY 54321         // Klucz do semaforów
+#define MAKS_KLIENTOW 1000    // Maksymalna liczba klientów przebywająca jednocześnie  w sklepie - można zmienić do liczby możliwych do wykonania procesów na serwerze
 
 typedef struct {
     int kolejka;              // Liczba klientów w kolejce
