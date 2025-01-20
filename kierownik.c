@@ -1,28 +1,56 @@
 #include "supermarket.h"
 
 int main() {
-    key_t key = ftok("supermarket", 65);
-    int msgid = msgget(key, 0666 | IPC_CREAT);
+    // Połączenie z pamięcią współdzieloną
+    int shm_id = shmget(SHM_KEY, MAX_KASY * sizeof(Kasa), 0666);
+    if (shm_id < 0) {
+        perror("Nie udało się połączyć z pamięcią współdzieloną");
+        exit(1);
+    }
 
-    int liczba_czynnych_kas = MIN_CZYNNE_KASY;
-    int liczba_klientow = 0;
+    Kasa *kasy = (Kasa *)shmat(shm_id, NULL, 0);
 
     while (1) {
-        Komunikat komunikat;
-        msgrcv(msgid, &komunikat, sizeof(Komunikat) - sizeof(long), MSG_TYPE_KLIENT, 0);
+        int liczba_klientow = 0;
+        int czynne_kasy = 0;
 
-        liczba_klientow += komunikat.liczba_klientow;
-        printf("Kierownik: Liczba klientów = %d\n", liczba_klientow);
-
-        if (liczba_klientow > liczba_czynnych_kas * KLIENT_PER_KASA && liczba_czynnych_kas < MAX_KASY) {
-            liczba_czynnych_kas++;
-            printf("Kierownik: Otwieram kasę %d\n", liczba_czynnych_kas);
+        // Oblicz liczbę klientów i aktywnych kas
+        for (int i = 0; i < MAX_KASY; i++) {
+            if (kasy[i].czynna) {
+                liczba_klientow += kasy[i].kolejka;
+                czynne_kasy++;
+            }
         }
 
-        if (liczba_czynnych_kas > MIN_CZYNNE_KASY && liczba_klientow < (liczba_czynnych_kas - 1) * KLIENT_PER_KASA) {
-            printf("Kierownik: Zamykam kasę %d\n", liczba_czynnych_kas);
-            liczba_czynnych_kas--;
+        // Otwieraj nowe kasy, gdy przekroczono próg klientów
+      if (czynne_kasy < MAX_KASY && liczba_klientow > KLIENT_PER_KASA * czynne_kasy) {
+            for (int i = 0; i < MAX_KASY; i++) {
+                if (!kasy[i].czynna) {
+                    kasy[i].czynna = 1;
+                    czynne_kasy++;
+                    printf("Kierownik: Otwieram kasę %d (klientów: %d, czynne kasy: %d)\n",
+                           i + 1, liczba_klientow, czynne_kasy);
+                    break;
+                }
+            }
         }
+
+        // Zamykaj kasy, gdy liczba klientów spadnie
+        if (czynne_kasy > MIN_CZYNNE_KASY &&
+            liczba_klientow <= KLIENT_PER_KASA * (czynne_kasy - 1)) {
+            for (int i = MAX_KASY - 1; i >= 0; i--) {
+                if (kasy[i].czynna) {
+                    kasy[i].czynna = 0;
+                    czynne_kasy--;
+                    printf("Kierownik: Zamykam kasę %d (klientów: %d, czynne kasy: %d)\n",
+                           i + 1, liczba_klientow, czynne_kasy);
+                    break;
+                }
+            }
+        }
+
+        // Częstsze sprawdzanie stanu
+        usleep(20000); // Sprawdzaj stan co 20 ms
     }
     return 0;
 }

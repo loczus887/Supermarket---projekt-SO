@@ -2,38 +2,47 @@
 #include <sys/wait.h>
 
 int main() {
-    pid_t pid_klient, pid_kierownik, pid_strazak;
+    pid_t pid;
 
-    pid_kierownik = fork();         // Proces kierownika
-    if (pid_kierownik == 0) {
+    // Inicjalizacja pamięci współdzielonej
+    int shm_id = shmget(SHM_KEY, MAX_KASY * sizeof(Kasa), IPC_CREAT | 0666);
+    if (shm_id < 0) {
+        perror("Nie udało się utworzyć pamięci współdzielonej");
+        exit(1);
+    }
+
+    Kasa *kasy = (Kasa *)shmat(shm_id, NULL, 0);
+
+    // Inicjalizacja kas
+    for (int i = 0; i < MAX_KASY; i++) {
+        kasy[i].czynna = (i < MIN_CZYNNE_KASY) ? 1 : 0; 
+        kasy[i].kolejka = 0;
+    }
+
+    printf("Uruchamianie kierownika...\n");
+    if ((pid = fork()) == 0) {
         execl("./kierownik", "./kierownik", NULL);
         perror("Nie udało się uruchomić procesu kierownika");
         exit(1);
     }
 
-    pid_klient = fork();     // Proces klienta
-    if (pid_klient == 0) {
-        execl("./klient", "./klient", NULL);
-        perror("Nie udało się uruchomić procesu klienta");
-        exit(1);
+    printf("Uruchamianie klientów...\n");
+    for (int i = 0; i < 10000; i++) {
+        if ((pid = fork()) == 0) {
+            char buf[10];
+            sprintf(buf, "%d", i + 1); // ID klienta
+            execl("./klient", "./klient", buf, NULL);
+            perror("Nie udało się uruchomić procesu klienta");
+            exit(1);
+        }
+        usleep(5000); // Odstęp między uruchamianiem klientów (5 ms)
+    }
+    //Tworzenie nowych keintów, tutaj max 10000 popracuj nad tym
+    for (int i = 0; i < 10000; i++) {
+        wait(NULL);
     }
 
-    pid_strazak = fork(); //Proces strażaka
-    if (pid_strazak == 0) {
-        execl("./strazak", "./strazak", NULL);
-        perror("Nie udało się uruchomić procesu strażaka");
-        exit(1);
-    }
-
-    printf("Wszystkie procesy zostały uruchomione.\n");
-    printf("Naciśnij Ctrl+C w oknie strażaka, aby symulować pożar i zakończyć działanie.\n");
-
-    // Oczekiwanie na zakończenie procesów
-    waitpid(pid_kierownik, NULL, 0);
-    waitpid(pid_klient, NULL, 0);
-    waitpid(pid_strazak, NULL, 0);
-
-    printf("Symulacja zakończona.\n");
+    printf("Wszyscy klienci zakończyli zakupy.\n");
 
     return 0;
 }
