@@ -1,4 +1,13 @@
 #include "supermarket.h"
+#include <signal.h>
+
+// Flaga do oznaczenia pożaru
+volatile sig_atomic_t sygnal_pozar = 0;
+
+// Funkcja obsługi sygnału pożaru
+void obsluga_pozaru(int sig) {
+    sygnal_pozar = 1;
+}
 
 int main() {
     // Połączenie z pamięcią współdzieloną
@@ -17,9 +26,36 @@ int main() {
         exit(1);
     }
     int *liczba_klientow = (int *)shmat(shm_klienci_id, NULL, 0);
-    *liczba_klientow = 0; 
+    *liczba_klientow = 0;
+
+    // Połączenie do flagi pożaru
+    int shm_pozar_id = shmget(SHM_POZAR_KEY, sizeof(int), 0666);
+    if (shm_pozar_id < 0) {
+        perror("Nie udało się połączyć z pamięcią flagi pożaru");
+        exit(1);
+    }
+    int *pozar = (int *)shmat(shm_pozar_id, NULL, 0);
+
+    // Ustawienie obsługi sygnału pożaru
+    signal(SIGINT, obsluga_pozaru);
 
     while (1) {
+        if (*pozar || sygnal_pozar) {
+
+            // Wypisywanie stanu kas przed zakończeniem
+            for (int i = 0; i < MAX_KASY; i++) {
+                if (kasy[i].czynna) {
+                    printf("Kierownik: Zamykam kasę %d, ewakuowani klienci z kolejki: %d\n", i + 1, kasy[i].kolejka);
+                } else {
+                    printf("Kierownik: Kasa %d już zamknięta.\n", i + 1);
+                }
+                kasy[i].czynna = 0;
+            }
+
+            printf("Kierownik: Sklep zamknięty. Wszyscy klienci opuścili supermarket.\n");
+            exit(0);
+        }
+
         int czynne_kasy = 0;
 
         // Liczenie czynnych kas
@@ -29,9 +65,7 @@ int main() {
             }
         }
 
-        printf("Kierownik: liczba_klientow = %d, czynne_kasy = %d\n",
-               *liczba_klientow, czynne_kasy);
-        fflush(stdout);
+        printf("Kierownik: liczba_klientow = %d, czynne_kasy = %d\n", *liczba_klientow, czynne_kasy);
 
         // Otwieranie nowych kas
         while (*liczba_klientow > KLIENT_PER_KASA * czynne_kasy && czynne_kasy < MAX_KASY) {
@@ -51,16 +85,12 @@ int main() {
                 if (kasy[i].czynna) {
                     kasy[i].czynna = 0;
                     czynne_kasy--;
-                    printf("Kierownik: Zamykam kasę %d (klientów: %d, czynne kasy: %d)\n",
-                           i + 1, *liczba_klientow, czynne_kasy);
-                    fflush(stdout);
+                    printf("Kierownik: Zamykam kasę %d\n", i + 1);
                     break;
                 }
             }
         }
 
-        usleep(100000); // Sprawdzanie co 100 ms
+        usleep(100000);
     }
-
-    return 0;
 }

@@ -15,9 +15,18 @@ int main() {
 
     // Inicjalizacja pamięci współdzielonej
     for (int i = 0; i < MAX_KASY; i++) {
-        kasy[i].czynna = (i < MIN_CZYNNE_KASY) ? 1 : 0; // Pierwsze 2 kasy otwarte
+        kasy[i].czynna = (i < MIN_CZYNNE_KASY) ? 1 : 0;
         kasy[i].kolejka = 0;
     }
+
+    // Inicjalizacja flagi pożaru
+    int shm_pozar_id = shmget(SHM_POZAR_KEY, sizeof(int), IPC_CREAT | 0666);
+    if (shm_pozar_id < 0) {
+        perror("Nie udało się utworzyć pamięci flagi pożaru");
+        exit(1);
+    }
+    int *pozar = (int *)shmat(shm_pozar_id, NULL, 0);
+    *pozar = 0;
 
     // Tworzenie kierownika
     pid = fork();
@@ -27,28 +36,34 @@ int main() {
         exit(1);
     }
 
-    //Zmienna dla ID klientów
+    // Tworzenie strażaka
+    pid = fork();
+    if (pid == 0) {
+        execl("./strazak", "./strazak", NULL);
+        perror("Nie udało się uruchomić strażaka");
+        exit(1);
+    }
+
     int id_klienta = 1;
 
     // Tworzenie klientów w pętli
     while (1) {
         if ((pid = fork()) == 0) {
             char buf[10];
-            sprintf(buf, "%d", id_klienta); // Przekazanie ID klienta do nowego procesu
+            sprintf(buf, "%d", id_klienta);
             execl("./klient", "./klient", buf, NULL);
             perror("Nie udało się uruchomić klienta");
             exit(1);
         }
 
-        id_klienta++; 
+        id_klienta++;
 
-        // Oczekiwanie na zakończone procesy klientów
         int status;
         while (waitpid(-1, &status, WNOHANG) > 0) {
             printf("Proces klienta zakończył się.\n");
         }
 
-        usleep(100000); // Odstęp między generowaniem klientów
+        usleep(100000);
     }
 
     return 0;
