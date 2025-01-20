@@ -16,30 +16,47 @@ int main(int argc, char *argv[]) {
     }
 
     Kasa *kasy = (Kasa *)shmat(shm_id, NULL, 0);
+
+    // Połączenie do zmiennej przechowującej liczbę klientów w sklepie
+    int shm_klienci_id = shmget(SHM_KEY + 1, sizeof(int), 0666);
+    if (shm_klienci_id < 0) {
+        perror("Nie udało się połączyć z liczbą klientów w sklepie");
+        exit(1);
+    }
+    int *liczba_klientow = (int *)shmat(shm_klienci_id, NULL, 0);
+
     srand(time(NULL) ^ getpid());
 
     while (1) {
-        int min_idx = -1;
-        int min_kolejka = __INT_MAX__;
-
-        // Znajdź kasę z najkrótszą kolejką
-        for (int i = 0; i < MAX_KASY; i++) {
-            if (kasy[i].czynna && kasy[i].kolejka < min_kolejka) {
-                min_kolejka = kasy[i].kolejka;
-                min_idx = i;
-            }
+        if (__sync_fetch_and_add(liczba_klientow, 0) < MAKS_KLIENTOW) {
+            __sync_fetch_and_add(liczba_klientow, 1);
+            printf("Klient %d: Wchodzę do sklepu.\n", id_klienta);
+            break;
+        } else {
+            printf("Klient %d: Sklep pełny, czekam na wejście.\n", id_klienta);
+            usleep(500000); 
         }
-
-        if (min_idx >= 0) {
-            __sync_fetch_and_add(&kasy[min_idx].kolejka, 1); // Atomowe zwiększenie kolejki
-            printf("Klient %d: Wybrałem kasę %d, kolejka = %d\n", id_klienta, min_idx + 1, kasy[min_idx].kolejka);
-            sleep(rand() % 3 + 1); // Symulacja zakupów (1-3 sekundy)
-            __sync_fetch_and_sub(&kasy[min_idx].kolejka, 1); // Atomowe zmniejszenie kolejki
-            printf("Klient %d: Opuszczam kasę %d\n", id_klienta, min_idx + 1);
-            break; 
-        }
-
-        usleep(rand() % 500000 + 100000); 
     }
-    return 0;
+
+    // Klient wybór kasy i zakupy
+    int min_idx = -1;
+    int min_kolejka = __INT_MAX__;
+    for (int i = 0; i < MAX_KASY; i++) {
+        if (kasy[i].czynna && kasy[i].kolejka < min_kolejka) {
+            min_kolejka = kasy[i].kolejka;
+            min_idx = i;
+        }
+    }
+
+    if (min_idx >= 0) {
+        __sync_fetch_and_add(&kasy[min_idx].kolejka, 1);
+        printf("Klient %d: Wybrałem kasę %d, kolejka = %d\n", id_klienta, min_idx + 1, kasy[min_idx].kolejka);
+        sleep(rand() % 5 + 1);
+        __sync_fetch_and_sub(&kasy[min_idx].kolejka, 1);
+    }
+
+    __sync_fetch_and_sub(liczba_klientow, 1);
+    printf("Klient %d: Opuszczam sklep.\n", id_klienta);
+    // Proces klienta kończy swoje działanie
+    exit(0);
 }
