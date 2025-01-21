@@ -65,7 +65,7 @@ int main(int argc, char *argv[]) {
         }
 
         for (int i = 0; i < MAX_KASY; i++) {
-            if (kasy[i].czynna && kasy[i].kolejka < min_kolejka) {
+            if (kasy[i].czynna && !kasy[i].do_zamkniecia && kasy[i].kolejka < min_kolejka) { 
                 min_kolejka = kasy[i].kolejka;
                 min_idx = i;
             }
