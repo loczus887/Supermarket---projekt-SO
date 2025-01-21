@@ -17,6 +17,7 @@ int main() {
     for (int i = 0; i < MAX_KASY; i++) {
         kasy[i].czynna = (i < MIN_CZYNNE_KASY) ? 1 : 0;
         kasy[i].kolejka = 0;
+        kasy[i].obsluzonych_klientow = 0;
     }
 
     // Inicjalizacja flagi pożaru

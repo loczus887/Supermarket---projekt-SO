@@ -1,5 +1,9 @@
 #include "supermarket.h"
 #include <signal.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 // Funkcja do czyszczenia zasobów IPC
 void wyczysc_ipc() {
@@ -9,6 +13,48 @@ void wyczysc_ipc() {
     shmctl(shmget(SHM_AWARIA_KEY, sizeof(int), 0666), IPC_RMID, NULL);
     printf("Strażak: Wyczyszczono zasoby IPC.\n");
 }
+
+
+void zapisz_raport() {
+    int fd = creat("raport_kasy.txt", S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+    if (fd < 0) {
+        perror("Nie udało się utworzyć pliku raportu");
+        return;
+    }
+
+    int shm_id = shmget(SHM_KEY, MAX_KASY * sizeof(Kasa), 0666);
+    if (shm_id < 0) {
+        perror("Nie udało się połączyć z pamięcią współdzieloną");
+        close(fd);
+        return;
+    }
+
+    Kasa *kasy = (Kasa *)shmat(shm_id, NULL, 0);
+
+    char buffer[256];
+    int len = snprintf(buffer, sizeof(buffer), "Raport dzienny - obsłużeni klienci:\n");
+    if (write(fd, buffer, len) < 0) {
+        perror("Nie udało się zapisać do pliku");
+        shmdt(kasy);
+        close(fd);
+        return;
+    }
+
+    for (int i = 0; i < MAX_KASY; i++) {
+        len = snprintf(buffer, sizeof(buffer), "Kasa %d: %d klientów\n", i + 1, kasy[i].obsluzonych_klientow);
+        if (write(fd, buffer, len) < 0) {
+            perror("Nie udało się zapisać do pliku");
+            shmdt(kasy);
+            close(fd);
+            return;
+        }
+    }
+
+    shmdt(kasy);
+    close(fd);
+    printf("Strażak: Raport zapisany do pliku 'raport_kasy.txt'.\n");
+}
+
 
 // Funkcja obsługi sygnału pożaru
 void strazak_obsluga_pozaru(int sig) {
@@ -23,7 +69,8 @@ void strazak_obsluga_pozaru(int sig) {
     printf("Strażak: Pożar! Wszyscy klienci muszą opuścić sklep.\n");
     shmdt(pozar);
 
-    // Czyszczenie zasobów IPC
+    // Czyszczenie zasobów IPC i zapis raportu
+    zapisz_raport();
     wyczysc_ipc();
     exit(0);
 }
@@ -41,7 +88,8 @@ void strazak_obsluga_awarii(int sig) {
     printf("Strażak: Awaria prądu! Wszyscy klienci muszą opuścić sklep.\n");
     shmdt(awaria);
 
-    // Czyszczenie zasobów IPC
+    // Czyszczenie zasobów IPC i zapis raportu
+    zapisz_raport();
     wyczysc_ipc();
     exit(0);
 }
