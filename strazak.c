@@ -1,25 +1,8 @@
 #include "supermarket.h"
+#include <signal.h>
 
-void strazak_obsluga(int sig) {
-    key_t key = ftok("supermarket", 65);
-    int msgid = msgget(key, 0666 | IPC_CREAT);
-
-    printf("Strażak: Pożar! Zamykam supermarket.\n");
-    msgctl(msgid, IPC_RMID, NULL);    //Usuwanie kolejki komunikatów
-    exit(0);
-}
-
-int main() {
-    signal(SIGINT, strazak_obsluga);
-    while (1) {
-        pause();
-    }
-    return 0;
-}
-#include "supermarket.h"
-
-void strazak_obsluga(int sig) {
-    // Połączenie do pamięci flagi pożaru
+// Funkcja obsługi sygnału pożaru
+void strazak_obsluga_pozaru(int sig) {
     int shm_pozar_id = shmget(SHM_POZAR_KEY, sizeof(int), 0666);
     if (shm_pozar_id < 0) {
         perror("Nie udało się połączyć z pamięcią flagi pożaru");
@@ -29,9 +12,23 @@ void strazak_obsluga(int sig) {
 
     *pozar = 1; // Ustawienie flagi pożaru
     printf("Strażak: Pożar! Wszyscy klienci muszą opuścić sklep.\n");
-    shmdt(pozar); // Odłączenie od pamięci
+    shmdt(pozar);
+    exit(0);
+}
 
-    exit(0); // Zakończenie procesu strażaka
+// Funkcja obsługi sygnału awarii prądu
+void strazak_obsluga_awarii(int sig) {
+    int shm_awaria_id = shmget(SHM_AWARIA_KEY, sizeof(int), 0666);
+    if (shm_awaria_id < 0) {
+        perror("Nie udało się połączyć z pamięcią flagi awarii");
+        exit(1);
+    }
+    int *awaria = (int *)shmat(shm_awaria_id, NULL, 0);
+
+    *awaria = 1; // Ustawienie flagi awarii
+    printf("Kierownik: Awaria prądu! Wszyscy klienci muszą opuścić sklep.\n");
+    shmdt(awaria);
+    exit(0);
 }
 
 int main() {
@@ -42,10 +39,27 @@ int main() {
         exit(1);
     }
     int *pozar = (int *)shmat(shm_pozar_id, NULL, 0);
-    *pozar = 0; // Początkowa wartość - brak pożaru
+    *pozar = 0;
 
-    signal(SIGINT, strazak_obsluga);
-    while (1) {
-        pause(); // Czekanie na sygnał
+    // Inicjalizacja pamięci flagi awarii
+    int shm_awaria_id = shmget(SHM_AWARIA_KEY, sizeof(int), IPC_CREAT | 0666);
+    if (shm_awaria_id < 0) {
+        perror("Nie udało się utworzyć pamięci flagi awarii");
+        exit(1);
     }
+    int *awaria = (int *)shmat(shm_awaria_id, NULL, 0);
+    *awaria = 0;
+
+    // Ustawienie obsługi sygnałów
+    signal(SIGINT, strazak_obsluga_pozaru); // CTRL+C - pożar
+    signal(SIGQUIT, strazak_obsluga_awarii); // CTRL+\ - awaria prądu
+
+    printf("Strażak: Wciśnij CTRL+C dla pożaru lub CTRL+\\ dla awarii prądu.\n");
+
+    // Czekanie na sygnały
+    while (1) {
+        pause(); // Oczekiwanie na sygnał
+    }
+
+    return 0;
 }

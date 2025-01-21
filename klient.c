@@ -33,6 +33,14 @@ int main(int argc, char *argv[]) {
     }
     int *pozar = (int *)shmat(shm_pozar_id, NULL, 0);
 
+    // Połączenie do pamięci flagi awarii
+    int shm_awaria_id = shmget(SHM_AWARIA_KEY, sizeof(int), 0666);
+    if (shm_awaria_id < 0) {
+        perror("Nie udało się połączyć z pamięcią flagi awarii");
+        exit(1);
+    }
+    int *awaria = (int *)shmat(shm_awaria_id, NULL, 0);
+
     srand(time(NULL) ^ getpid());
 
     while (1) {
@@ -50,8 +58,8 @@ int main(int argc, char *argv[]) {
     int min_idx = -1;
     int min_kolejka = __INT_MAX__;
     while (1) {
-        if (*pozar) {
-            printf("Klient %d: Pożar! Opuszczam sklep.\n", id_klienta);
+        if (*pozar || *awaria) {
+            printf("Klient %d: Awaria lub pożar! Opuszczam sklep.\n", id_klienta);
             __sync_fetch_and_sub(liczba_klientow, 1);
             exit(0);
         }

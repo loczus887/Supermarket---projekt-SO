@@ -22,6 +22,7 @@
 #define SEM_KEY 54321         // Klucz do semaforów
 #define MAKS_KLIENTOW 1000    // Maksymalna liczba klientów przebywająca jednocześnie  w sklepie - można zmienić do liczby możliwych do wykonania procesów na serwerze
 #define SHM_POZAR_KEY 54322 // Klucz do pamięci flagi pożaru
+#define SHM_AWARIA_KEY 54323 // Klucz do pamięci flagi awarii prądu
 
 typedef struct {
     int kolejka;              // Liczba klientów w kolejce

@@ -36,23 +36,31 @@ int main() {
     }
     int *pozar = (int *)shmat(shm_pozar_id, NULL, 0);
 
+    // Połączenie do pamięci flagi awarii
+    int shm_awaria_id = shmget(SHM_AWARIA_KEY, sizeof(int), IPC_CREAT | 0666);
+    if (shm_awaria_id < 0) {
+        perror("Nie udało się utworzyć pamięci flagi awarii");
+        exit(1);
+    }
+    int *awaria = (int *)shmat(shm_awaria_id, NULL, 0);
+    *awaria = 0; // Początkowa wartość - brak awarii
+
     // Ustawienie obsługi sygnału pożaru
     signal(SIGINT, obsluga_pozaru);
 
     while (1) {
         if (*pozar || sygnal_pozar) {
-
-            // Wypisywanie stanu kas przed zakończeniem
             for (int i = 0; i < MAX_KASY; i++) {
                 if (kasy[i].czynna) {
-                    printf("Kierownik: Zamykam kasę %d, ewakuowani klienci z kolejki: %d\n", i + 1, kasy[i].kolejka);
-                } else {
-                    printf("Kierownik: Kasa %d już zamknięta.\n", i + 1);
+                    printf("Kierownik: Zamykam kasę %d. Wyproszeni klienci z kolejki %d\n", i + 1, kasy[i].kolejka);
+                }
+                else{
+                    printf("Kierownik: Kasa %d już była zamknięta\n", i + 1);
+
                 }
                 kasy[i].czynna = 0;
             }
 
-            printf("Kierownik: Sklep zamknięty. Wszyscy klienci opuścili supermarket.\n");
             exit(0);
         }
 

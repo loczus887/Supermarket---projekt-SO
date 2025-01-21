@@ -28,6 +28,15 @@ int main() {
     int *pozar = (int *)shmat(shm_pozar_id, NULL, 0);
     *pozar = 0;
 
+    // Inicjalizacja pamięci flagi awarii
+    int shm_awaria_id = shmget(SHM_AWARIA_KEY, sizeof(int), IPC_CREAT | 0666);
+    if (shm_awaria_id < 0) {
+        perror("Nie udało się utworzyć pamięci flagi awarii");
+        exit(1);
+    }
+    int *awaria = (int *)shmat(shm_awaria_id, NULL, 0);
+    *awaria = 0; // Początkowa wartość - brak awarii
+
     // Tworzenie kierownika
     pid = fork();
     if (pid == 0) {
