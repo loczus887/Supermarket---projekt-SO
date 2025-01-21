@@ -52,7 +52,7 @@ int main() {
         if (*pozar || sygnal_pozar) {
             for (int i = 0; i < MAX_KASY; i++) {
                 if (kasy[i].czynna) {
-                    printf("Kierownik: Zamykam kasę %d. Wyproszeni klienci z kolejki %d\n", i + 1, kasy[i].kolejka);
+                    printf("Kierownik: Zamykam kasę %d. Ewakuowani klienci z kolejki %d\n", i + 1, kasy[i].kolejka);
                 } else {
                     printf("Kierownik: Kasa %d była już zamknięta.\n", i + 1);
                 }
@@ -100,20 +100,13 @@ int main() {
 
         // Zamykanie kas
         while (czynne_kasy > MIN_CZYNNE_KASY &&
-       *liczba_klientow <= KLIENT_PER_KASA * (czynne_kasy - 1)) {
+               *liczba_klientow <= KLIENT_PER_KASA * (czynne_kasy - 1)) {
             for (int i = MAX_KASY - 1; i >= 0; i--) {
-                if (kasy[i].czynna) {
-                    if (kasy[i].kolejka > 0) {
-                    // Kasa ma klientów w kolejce, blokujemy wpuszczanie nowych
-                    kasy[i].przyjmuje_klientow = 0;
-                    printf("Kierownik: Kasa %d nie przyjmuje nowych klientów, obsługuje kolejkę (%d klientów).\n", i + 1, kasy[i].kolejka);
-                    } else {
-                    // Kasa jest pusta, można ją zamknąć
+                if (kasy[i].czynna && kasy[i].kolejka == 0) {
                     kasy[i].czynna = 0;
                     czynne_kasy--;
                     printf("Kierownik: Zamykam kasę %d (pusta).\n", i + 1);
                     break;
-                    }
                 }
             }
         }
