@@ -28,6 +28,7 @@ typedef struct {
     int kolejka;              // Liczba klientów w kolejce
     int czynna;               // 0 - kasa zamknięta, 1 - kasa otwarta
     int do_zamkniecia;        // 0 - normalna praca, 1 - kasa w stanie zamykania
+    int obsluzonych_klientow; // Liczba obsłużonych klientów
 } Kasa;
 
 #endif
