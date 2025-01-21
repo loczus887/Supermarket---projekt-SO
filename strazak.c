@@ -1,6 +1,15 @@
 #include "supermarket.h"
 #include <signal.h>
 
+// Funkcja do czyszczenia zasobów IPC
+void wyczysc_ipc() {
+    shmctl(shmget(SHM_KEY, MAX_KASY * sizeof(Kasa), 0666), IPC_RMID, NULL);
+    shmctl(shmget(SHM_KEY + 1, sizeof(int), 0666), IPC_RMID, NULL);
+    shmctl(shmget(SHM_POZAR_KEY, sizeof(int), 0666), IPC_RMID, NULL);
+    shmctl(shmget(SHM_AWARIA_KEY, sizeof(int), 0666), IPC_RMID, NULL);
+    printf("Strażak: Wyczyszczono zasoby IPC.\n");
+}
+
 // Funkcja obsługi sygnału pożaru
 void strazak_obsluga_pozaru(int sig) {
     int shm_pozar_id = shmget(SHM_POZAR_KEY, sizeof(int), 0666);
@@ -13,6 +22,9 @@ void strazak_obsluga_pozaru(int sig) {
     *pozar = 1; // Ustawienie flagi pożaru
     printf("Strażak: Pożar! Wszyscy klienci muszą opuścić sklep.\n");
     shmdt(pozar);
+
+    // Czyszczenie zasobów IPC
+    wyczysc_ipc();
     exit(0);
 }
 
@@ -26,8 +38,11 @@ void strazak_obsluga_awarii(int sig) {
     int *awaria = (int *)shmat(shm_awaria_id, NULL, 0);
 
     *awaria = 1; // Ustawienie flagi awarii
-    printf("Kierownik: Awaria prądu! Wszyscy klienci muszą opuścić sklep.\n");
+    printf("Strażak: Awaria prądu! Wszyscy klienci muszą opuścić sklep.\n");
     shmdt(awaria);
+
+    // Czyszczenie zasobów IPC
+    wyczysc_ipc();
     exit(0);
 }
 
