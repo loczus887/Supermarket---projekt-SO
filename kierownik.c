@@ -53,10 +53,8 @@ int main() {
             for (int i = 0; i < MAX_KASY; i++) {
                 if (kasy[i].czynna) {
                     printf("Kierownik: Zamykam kasę %d. Wyproszeni klienci z kolejki %d\n", i + 1, kasy[i].kolejka);
-                }
-                else{
-                    printf("Kierownik: Kasa %d już była zamknięta\n", i + 1);
-
+                } else {
+                    printf("Kierownik: Kasa %d była już zamknięta.\n", i + 1);
                 }
                 kasy[i].czynna = 0;
             }
@@ -77,24 +75,45 @@ int main() {
 
         // Otwieranie nowych kas
         while (*liczba_klientow > KLIENT_PER_KASA * czynne_kasy && czynne_kasy < MAX_KASY) {
+            int otwarto = 0;
             for (int i = 0; i < MAX_KASY; i++) {
-                if (!kasy[i].czynna) {
+                if (!kasy[i].czynna && kasy[i].kolejka > 0) {
                     kasy[i].czynna = 1;
                     czynne_kasy++;
+                    otwarto = 1;
+                    printf("Kierownik: Otwieram kasę %d (ma klientów w kolejce).\n", i + 1);
                     break;
+                }
+            }
+
+            if (!otwarto) {
+                for (int i = 0; i < MAX_KASY; i++) {
+                    if (!kasy[i].czynna) {
+                        kasy[i].czynna = 1;
+                        czynne_kasy++;
+                        printf("Kierownik: Otwieram kasę %d.\n", i + 1);
+                        break;
+                    }
                 }
             }
         }
 
         // Zamykanie kas
         while (czynne_kasy > MIN_CZYNNE_KASY &&
-               *liczba_klientow <= KLIENT_PER_KASA * (czynne_kasy - 1)) {
+       *liczba_klientow <= KLIENT_PER_KASA * (czynne_kasy - 1)) {
             for (int i = MAX_KASY - 1; i >= 0; i--) {
                 if (kasy[i].czynna) {
+                    if (kasy[i].kolejka > 0) {
+                    // Kasa ma klientów w kolejce, blokujemy wpuszczanie nowych
+                    kasy[i].przyjmuje_klientow = 0;
+                    printf("Kierownik: Kasa %d nie przyjmuje nowych klientów, obsługuje kolejkę (%d klientów).\n", i + 1, kasy[i].kolejka);
+                    } else {
+                    // Kasa jest pusta, można ją zamknąć
                     kasy[i].czynna = 0;
                     czynne_kasy--;
-                    printf("Kierownik: Zamykam kasę %d\n", i + 1);
+                    printf("Kierownik: Zamykam kasę %d (pusta).\n", i + 1);
                     break;
+                    }
                 }
             }
         }
