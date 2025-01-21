@@ -11,7 +11,7 @@ void obsluga_pozaru(int sig) {
 
 int main() {
     // Połączenie z pamięcią współdzieloną
-    int shm_id = shmget(SHM_KEY, MAX_KASY * sizeof(Kasa), 0666);
+    int shm_id = shmget(SHM_KEY, MAX_KASY * sizeof(Kasa), 0600);
     if (shm_id < 0) {
         perror("Nie udało się połączyć z pamięcią współdzieloną");
         exit(1);
@@ -20,7 +20,7 @@ int main() {
     Kasa *kasy = (Kasa *)shmat(shm_id, NULL, 0);
 
     // Połączenie do zmiennej przechowującej liczbę klientów w sklepie
-    int shm_klienci_id = shmget(SHM_KEY + 1, sizeof(int), IPC_CREAT | 0666);
+    int shm_klienci_id = shmget(SHM_KEY + 1, sizeof(int), IPC_CREAT | 0600);
     if (shm_klienci_id < 0) {
         perror("Nie udało się utworzyć pamięci dla liczby klientów w sklepie");
         exit(1);
@@ -29,7 +29,7 @@ int main() {
     *liczba_klientow = 0;
 
     // Połączenie do flagi pożaru
-    int shm_pozar_id = shmget(SHM_POZAR_KEY, sizeof(int), 0666);
+    int shm_pozar_id = shmget(SHM_POZAR_KEY, sizeof(int), 0600);
     if (shm_pozar_id < 0) {
         perror("Nie udało się połączyć z pamięcią flagi pożaru");
         exit(1);
@@ -37,7 +37,7 @@ int main() {
     int *pozar = (int *)shmat(shm_pozar_id, NULL, 0);
 
     // Połączenie do pamięci flagi awarii
-    int shm_awaria_id = shmget(SHM_AWARIA_KEY, sizeof(int), IPC_CREAT | 0666);
+    int shm_awaria_id = shmget(SHM_AWARIA_KEY, sizeof(int), IPC_CREAT | 0600);
     if (shm_awaria_id < 0) {
         perror("Nie udało się utworzyć pamięci flagi awarii");
         exit(1);

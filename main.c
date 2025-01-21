@@ -5,7 +5,7 @@ int main() {
     pid_t pid;
 
     // Połączenie z pamięcią współdzieloną
-    int shm_id = shmget(SHM_KEY, MAX_KASY * sizeof(Kasa), IPC_CREAT | 0666);
+    int shm_id = shmget(SHM_KEY, MAX_KASY * sizeof(Kasa), IPC_CREAT | 0600);
     if (shm_id < 0) {
         perror("Nie udało się utworzyć pamięci współdzielonej");
         exit(1);
@@ -21,7 +21,7 @@ int main() {
     }
 
     // Inicjalizacja flagi pożaru
-    int shm_pozar_id = shmget(SHM_POZAR_KEY, sizeof(int), IPC_CREAT | 0666);
+    int shm_pozar_id = shmget(SHM_POZAR_KEY, sizeof(int), IPC_CREAT | 0600);
     if (shm_pozar_id < 0) {
         perror("Nie udało się utworzyć pamięci flagi pożaru");
         exit(1);
@@ -30,7 +30,7 @@ int main() {
     *pozar = 0;
 
     // Inicjalizacja pamięci flagi awarii
-    int shm_awaria_id = shmget(SHM_AWARIA_KEY, sizeof(int), IPC_CREAT | 0666);
+    int shm_awaria_id = shmget(SHM_AWARIA_KEY, sizeof(int), IPC_CREAT | 0600);
     if (shm_awaria_id < 0) {
         perror("Nie udało się utworzyć pamięci flagi awarii");
         exit(1);

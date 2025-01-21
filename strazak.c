@@ -7,22 +7,22 @@
 
 // Funkcja do czyszczenia zasobów IPC
 void wyczysc_ipc() {
-    shmctl(shmget(SHM_KEY, MAX_KASY * sizeof(Kasa), 0666), IPC_RMID, NULL);
-    shmctl(shmget(SHM_KEY + 1, sizeof(int), 0666), IPC_RMID, NULL);
-    shmctl(shmget(SHM_POZAR_KEY, sizeof(int), 0666), IPC_RMID, NULL);
-    shmctl(shmget(SHM_AWARIA_KEY, sizeof(int), 0666), IPC_RMID, NULL);
+    shmctl(shmget(SHM_KEY, MAX_KASY * sizeof(Kasa), 0600), IPC_RMID, NULL);
+    shmctl(shmget(SHM_KEY + 1, sizeof(int), 0600), IPC_RMID, NULL);
+    shmctl(shmget(SHM_POZAR_KEY, sizeof(int), 0600), IPC_RMID, NULL);
+    shmctl(shmget(SHM_AWARIA_KEY, sizeof(int), 0600), IPC_RMID, NULL);
     printf("Strażak: Wyczyszczono zasoby IPC.\n");
 }
 
 
 void zapisz_raport() {
-    int fd = creat("raport_kasy.txt", S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+    int fd = creat("raport_kasy.txt", S_IRUSR | S_IWUSR);
     if (fd < 0) {
         perror("Nie udało się utworzyć pliku raportu");
         return;
     }
 
-    int shm_id = shmget(SHM_KEY, MAX_KASY * sizeof(Kasa), 0666);
+    int shm_id = shmget(SHM_KEY, MAX_KASY * sizeof(Kasa), 0600);
     if (shm_id < 0) {
         perror("Nie udało się połączyć z pamięcią współdzieloną");
         close(fd);
@@ -58,7 +58,7 @@ void zapisz_raport() {
 
 // Funkcja obsługi sygnału pożaru
 void strazak_obsluga_pozaru(int sig) {
-    int shm_pozar_id = shmget(SHM_POZAR_KEY, sizeof(int), 0666);
+    int shm_pozar_id = shmget(SHM_POZAR_KEY, sizeof(int), 0600);
     if (shm_pozar_id < 0) {
         perror("Nie udało się połączyć z pamięcią flagi pożaru");
         exit(1);
@@ -77,7 +77,7 @@ void strazak_obsluga_pozaru(int sig) {
 
 // Funkcja obsługi sygnału awarii prądu
 void strazak_obsluga_awarii(int sig) {
-    int shm_awaria_id = shmget(SHM_AWARIA_KEY, sizeof(int), 0666);
+    int shm_awaria_id = shmget(SHM_AWARIA_KEY, sizeof(int), 0600);
     if (shm_awaria_id < 0) {
         perror("Nie udało się połączyć z pamięcią flagi awarii");
         exit(1);
@@ -96,7 +96,7 @@ void strazak_obsluga_awarii(int sig) {
 
 int main() {
     // Inicjalizacja pamięci flagi pożaru
-    int shm_pozar_id = shmget(SHM_POZAR_KEY, sizeof(int), IPC_CREAT | 0666);
+    int shm_pozar_id = shmget(SHM_POZAR_KEY, sizeof(int), IPC_CREAT | 0600);
     if (shm_pozar_id < 0) {
         perror("Nie udało się utworzyć pamięci flagi pożaru");
         exit(1);
@@ -105,7 +105,7 @@ int main() {
     *pozar = 0;
 
     // Inicjalizacja pamięci flagi awarii
-    int shm_awaria_id = shmget(SHM_AWARIA_KEY, sizeof(int), IPC_CREAT | 0666);
+    int shm_awaria_id = shmget(SHM_AWARIA_KEY, sizeof(int), IPC_CREAT | 0600);
     if (shm_awaria_id < 0) {
         perror("Nie udało się utworzyć pamięci flagi awarii");
         exit(1);

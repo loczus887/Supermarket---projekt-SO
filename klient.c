@@ -9,7 +9,7 @@ int main(int argc, char *argv[]) {
     int id_klienta = atoi(argv[1]); // ID klienta przekazane jako argument
 
     // Połączenie z pamięcią współdzieloną
-    int shm_id = shmget(SHM_KEY, MAX_KASY * sizeof(Kasa), 0666);
+    int shm_id = shmget(SHM_KEY, MAX_KASY * sizeof(Kasa), 0600);
     if (shm_id < 0) {
         perror("Nie udało się połączyć z pamięcią współdzieloną");
         exit(1);
@@ -18,7 +18,7 @@ int main(int argc, char *argv[]) {
     Kasa *kasy = (Kasa *)shmat(shm_id, NULL, 0);
 
     // Połączenie do zmiennej przechowującej liczbę klientów w sklepie
-    int shm_klienci_id = shmget(SHM_KEY + 1, sizeof(int), 0666);
+    int shm_klienci_id = shmget(SHM_KEY + 1, sizeof(int), 0600);
     if (shm_klienci_id < 0) {
         perror("Nie udało się połączyć z liczbą klientów w sklepie");
         exit(1);
@@ -26,7 +26,7 @@ int main(int argc, char *argv[]) {
     int *liczba_klientow = (int *)shmat(shm_klienci_id, NULL, 0);
 
     // Połączenie do flagi pożaru
-    int shm_pozar_id = shmget(SHM_POZAR_KEY, sizeof(int), 0666);
+    int shm_pozar_id = shmget(SHM_POZAR_KEY, sizeof(int), 0600);
     if (shm_pozar_id < 0) {
         perror("Nie udało się połączyć z pamięcią flagi pożaru");
         exit(1);
@@ -34,7 +34,7 @@ int main(int argc, char *argv[]) {
     int *pozar = (int *)shmat(shm_pozar_id, NULL, 0);
 
     // Połączenie do pamięci flagi awarii
-    int shm_awaria_id = shmget(SHM_AWARIA_KEY, sizeof(int), 0666);
+    int shm_awaria_id = shmget(SHM_AWARIA_KEY, sizeof(int), 0600);
     if (shm_awaria_id < 0) {
         perror("Nie udało się połączyć z pamięcią flagi awarii");
         exit(1);
@@ -74,7 +74,7 @@ int main(int argc, char *argv[]) {
         if (min_idx >= 0) {
             __sync_fetch_and_add(&kasy[min_idx].kolejka, 1);
             printf("Klient %d: Wybrałem kasę %d, kolejka = %d\n", id_klienta, min_idx + 1, kasy[min_idx].kolejka);
-            sleep(rand() % 5 + 1);
+            sleep(rand() % 10 + 1);
             __sync_fetch_and_sub(&kasy[min_idx].kolejka, 1);
             __sync_fetch_and_add(&kasy[min_idx].obsluzonych_klientow, 1);
             break;
