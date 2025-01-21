@@ -47,7 +47,7 @@ int main() {
 
     // Ustawienie obsługi sygnału pożaru
     signal(SIGINT, obsluga_pozaru);
-
+    int liczba_kas_do_zamkniecia = 0;
     while (1) {
         if (*pozar || sygnal_pozar) {
             for (int i = 0; i < MAX_KASY; i++) {
@@ -64,6 +64,7 @@ int main() {
 
         int czynne_kasy = 0;
 
+
         // Liczenie czynnych kas
         for (int i = 0; i < MAX_KASY; i++) {
             if (kasy[i].czynna) {
@@ -73,24 +74,38 @@ int main() {
 
         printf("Kierownik: liczba_klientow = %d, czynne_kasy = %d\n", *liczba_klientow, czynne_kasy);
 
-        // Otwieranie nowych kas
-        while (*liczba_klientow > KLIENT_PER_KASA * czynne_kasy && czynne_kasy < MAX_KASY) {
-            int otwarto = 0;
-            for (int i = 0; i < MAX_KASY; i++) {
-                if (!kasy[i].czynna && !kasy[i].do_zamkniecia) {
-                    kasy[i].czynna = 1;
-                    czynne_kasy++;
-                    printf("Kierownik: Otwieram kasę %d.\n", i + 1);
-                    break;
-                }
+        // Otwieranie nowych kas lub przywracanie oznaczonych do zamknięcia
+    while (*liczba_klientow > KLIENT_PER_KASA * (czynne_kasy-liczba_kas_do_zamkniecia) && czynne_kasy < MAX_KASY) {
+        int otwarto = 0;
+        for (int i = 0; i < MAX_KASY; i++) {
+            // Przywracanie kas oznaczonych do zamknięcia
+            if (kasy[i].do_zamkniecia) {
+                kasy[i].do_zamkniecia = 0;
+                liczba_kas_do_zamkniecia--;
+                czynne_kasy++;
+                printf("Kierownik: Przywracam do działania kasę %d.\n", i + 1);
+                otwarto = 1;
+                break;
+            }
+            // Otwieranie nowych kas
+            else if (!kasy[i].czynna && !kasy[i].do_zamkniecia) {
+                kasy[i].czynna = 1;
+                czynne_kasy++;
+                printf("Kierownik: Otwieram kasę %d.\n", i + 1);
+                otwarto = 1;
+                break;
             }
         }
+        if (!otwarto) {
+            break;
+        }
+    }
 
         // Oznaczanie kas do zamknięcia
         for (int i = MAX_KASY - 1; i >= 0; i--) {
-            if (kasy[i].czynna && kasy[i].kolejka == 0 && czynne_kasy > MIN_CZYNNE_KASY && !kasy[i].do_zamkniecia) {
+            if (*liczba_klientow <= KLIENT_PER_KASA * (czynne_kasy-1-liczba_kas_do_zamkniecia) && kasy[i].czynna && czynne_kasy > MIN_CZYNNE_KASY && !kasy[i].do_zamkniecia) {
                 kasy[i].do_zamkniecia = 1;
-                printf("Kierownik: Kasa %d oznaczona do zamknięcia.\n", i + 1);
+                liczba_kas_do_zamkniecia++;
                 break;
             }
         }
@@ -101,6 +116,7 @@ int main() {
                 kasy[i].czynna = 0;
                 kasy[i].do_zamkniecia = 0;
                 czynne_kasy--;
+                liczba_kas_do_zamkniecia--;
                 printf("Kierownik: Zamykam kasę %d.\n", i + 1);
             }
         }
