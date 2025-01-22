@@ -65,7 +65,7 @@ int main(int argc, char *argv[]) {
         }
 
         for (int i = 0; i < MAX_KASY; i++) {
-            if (kasy[i].czynna && !kasy[i].do_zamkniecia && kasy[i].kolejka < min_kolejka) { //tu zmiana
+            if (kasy[i].czynna && !kasy[i].do_zamkniecia && kasy[i].kolejka < min_kolejka) {
                 min_kolejka = kasy[i].kolejka;
                 min_idx = i;
             }
@@ -74,7 +74,7 @@ int main(int argc, char *argv[]) {
         if (min_idx >= 0) {
             __sync_fetch_and_add(&kasy[min_idx].kolejka, 1);
             printf("Klient %d: Wybrałem kasę %d, kolejka = %d\n", id_klienta, min_idx + 1, kasy[min_idx].kolejka);
-            sleep(rand() % 10 + 1);
+            sleep(rand() % 5 + 1);
             __sync_fetch_and_sub(&kasy[min_idx].kolejka, 1);
             __sync_fetch_and_add(&kasy[min_idx].obsluzonych_klientow, 1);
             break;

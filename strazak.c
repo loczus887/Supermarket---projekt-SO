@@ -11,6 +11,7 @@ void wyczysc_ipc() {
     shmctl(shmget(SHM_KEY + 1, sizeof(int), 0600), IPC_RMID, NULL);
     shmctl(shmget(SHM_POZAR_KEY, sizeof(int), 0600), IPC_RMID, NULL);
     shmctl(shmget(SHM_AWARIA_KEY, sizeof(int), 0600), IPC_RMID, NULL);
+    shmctl(shmget(SHM_PROCESSES_KEY, sizeof(int), 0600), IPC_RMID, NULL);
     printf("Strażak: Wyczyszczono zasoby IPC.\n");
 }
 
