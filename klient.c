@@ -8,16 +8,15 @@ int main(int argc, char *argv[]) {
 
     int id_klienta = atoi(argv[1]); // ID klienta przekazane jako argument
 
-    // Połączenie z pamięcią współdzieloną
+    // Połączenie z pamięcią współdzieloną dla kas
     int shm_id = shmget(SHM_KEY, MAX_KASY * sizeof(Kasa), 0600);
     if (shm_id < 0) {
         perror("Nie udało się połączyć z pamięcią współdzieloną");
         exit(1);
     }
-
     Kasa *kasy = (Kasa *)shmat(shm_id, NULL, 0);
 
-    // Połączenie do zmiennej przechowującej liczbę klientów w sklepie
+    // Połączenie do zmiennej przechowującej liczbę klientów
     int shm_klienci_id = shmget(SHM_KEY + 1, sizeof(int), 0600);
     if (shm_klienci_id < 0) {
         perror("Nie udało się połączyć z liczbą klientów w sklepie");
@@ -33,7 +32,7 @@ int main(int argc, char *argv[]) {
     }
     int *pozar = (int *)shmat(shm_pozar_id, NULL, 0);
 
-    // Połączenie do pamięci flagi awarii
+    // Połączenie do flagi awarii
     int shm_awaria_id = shmget(SHM_AWARIA_KEY, sizeof(int), 0600);
     if (shm_awaria_id < 0) {
         perror("Nie udało się połączyć z pamięcią flagi awarii");
@@ -41,8 +40,9 @@ int main(int argc, char *argv[]) {
     }
     int *awaria = (int *)shmat(shm_awaria_id, NULL, 0);
 
-    srand(time(NULL) ^ getpid());
+    srand(time(NULL) ^ getpid()); // Inicjalizacja generatora losowego
 
+    // Klient czeka na wejście do sklepu, jeśli jest pełny
     while (1) {
         if (__sync_fetch_and_add(liczba_klientow, 0) < MAKS_KLIENTOW) {
             __sync_fetch_and_add(liczba_klientow, 1);
@@ -50,20 +50,21 @@ int main(int argc, char *argv[]) {
             break;
         } else {
             printf("Klient %d: Sklep pełny, czekam na wejście.\n", id_klienta);
-            usleep(500000);
+            usleep(500000); // Oczekiwanie przed ponowną próbą
         }
     }
 
-    // Klient wybór kasy i zakupy
+    // Klient wybiera kasę o najkrótszej kolejce
     int min_idx = -1;
     int min_kolejka = __INT_MAX__;
     while (1) {
         if (*pozar || *awaria) {
-            printf("Klient %d: Awaria lub pożar! Opuszczam sklep.\n", id_klienta);
+            // Klient opuszcza sklep w przypadku pożaru lub awarii
             __sync_fetch_and_sub(liczba_klientow, 1);
             exit(0);
         }
 
+        // Szukanie kasy o najkrótszej kolejce
         for (int i = 0; i < MAX_KASY; i++) {
             if (kasy[i].czynna && !kasy[i].do_zamkniecia && kasy[i].kolejka < min_kolejka) {
                 min_kolejka = kasy[i].kolejka;
@@ -72,17 +73,19 @@ int main(int argc, char *argv[]) {
         }
 
         if (min_idx >= 0) {
+            // Klient dołącza do kolejki
             __sync_fetch_and_add(&kasy[min_idx].kolejka, 1);
             printf("Klient %d: Wybrałem kasę %d, kolejka = %d\n", id_klienta, min_idx + 1, kasy[min_idx].kolejka);
-            sleep(rand() % 5 + 1);
+            sleep(rand() % 5 + 1); // Symulacja zakupów
             __sync_fetch_and_sub(&kasy[min_idx].kolejka, 1);
             __sync_fetch_and_add(&kasy[min_idx].obsluzonych_klientow, 1);
             break;
         }
 
-        usleep(100000);
+        usleep(100000); // Oczekiwanie przed ponowną próbą wyboru kasy
     }
 
+    // Klient opuszcza sklep po zakończeniu zakupów
     __sync_fetch_and_sub(liczba_klientow, 1);
     printf("Klient %d: Opuszczam sklep.\n", id_klienta);
     exit(0);

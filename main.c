@@ -13,52 +13,53 @@ int main() {
         exit(1);
     }
 
+    // Mapowanie pamięci współdzielonej do przestrzeni adresowej procesu
     Kasa *kasy = (Kasa *)shmat(shm_id, NULL, 0);
 
-    // Inicjalizacja pamięci współdzielonej dla kas
+    // Inicjalizacja kas: ustawienie początkowych wartości
     for (int i = 0; i < MAX_KASY; i++) {
-        kasy[i].czynna = (i < MIN_CZYNNE_KASY) ? 1 : 0;
-        kasy[i].kolejka = 0;
-        kasy[i].obsluzonych_klientow = 0;
+        kasy[i].czynna = (i < MIN_CZYNNE_KASY) ? 1 : 0; // Ustawienie minimalnej liczby czynnych kas
+        kasy[i].kolejka = 0;                            // Początkowa długość kolejki
+        kasy[i].obsluzonych_klientow = 0;               // Początkowa liczba obsłużonych klientów
     }
 
-    // Inicjalizacja pamięci współdzielonej dla liczby klientów
+    // Tworzenie pamięci współdzielonej dla liczby klientów
     int shm_klienci_id = shmget(SHM_KEY + 1, sizeof(int), IPC_CREAT | 0600);
     if (shm_klienci_id < 0) {
         perror("Nie udało się utworzyć pamięci współdzielonej dla liczby klientów");
         exit(1);
     }
     int *liczba_klientow = (int *)shmat(shm_klienci_id, NULL, 0);
-    *liczba_klientow = 0;
+    *liczba_klientow = 0; // Początkowa liczba klientów
 
-    // Inicjalizacja pamięci współdzielonej dla liczby procesów
+    // Analogiczne tworzenie i inicjalizacja pamięci dla liczby procesów
     int shm_processes_id = shmget(SHM_PROCESSES_KEY, sizeof(int), IPC_CREAT | 0600);
     if (shm_processes_id < 0) {
         perror("Nie udało się utworzyć pamięci współdzielonej dla liczby procesów");
         exit(1);
     }
     int *liczba_procesow = (int *)shmat(shm_processes_id, NULL, 0);
-    *liczba_procesow = 0;
+    *liczba_procesow = 0; // Początkowa liczba procesów
 
-    // Inicjalizacja pamięci współdzielonej dla flagi pożaru
+    // Analogiczne tworzenie pamięci współdzielonej dla flagi pożaru
     int shm_pozar_id = shmget(SHM_POZAR_KEY, sizeof(int), IPC_CREAT | 0600);
     if (shm_pozar_id < 0) {
         perror("Nie udało się utworzyć pamięci współdzielonej dla flagi pożaru");
         exit(1);
     }
     int *pozar = (int *)shmat(shm_pozar_id, NULL, 0);
-    *pozar = 0;
+    *pozar = 0; // Początkowa wartość flagi pożaru
 
-    // Inicjalizacja pamięci współdzielonej dla flagi awarii
+    // Analogiczne tworzenie pamięci współdzielonej dla flagi awarii
     int shm_awaria_id = shmget(SHM_AWARIA_KEY, sizeof(int), IPC_CREAT | 0600);
     if (shm_awaria_id < 0) {
         perror("Nie udało się utworzyć pamięci współdzielonej dla flagi awarii");
         exit(1);
     }
     int *awaria = (int *)shmat(shm_awaria_id, NULL, 0);
-    *awaria = 0;
+    *awaria = 0; // Początkowa wartość flagi awarii
 
-    // Tworzenie kierownika
+    // Tworzenie procesu dla kierownika
     pid = fork();
     if (pid == 0) {
         execl("./kierownik", "./kierownik", NULL);
@@ -66,7 +67,7 @@ int main() {
         exit(1);
     }
 
-    // Tworzenie strażaka
+    // Tworzenie procesu dla strażaka
     pid = fork();
     if (pid == 0) {
         execl("./strazak", "./strazak", NULL);
@@ -74,48 +75,42 @@ int main() {
         exit(1);
     }
 
-    int id_klienta = 1;
+    int id_klienta = 1; // ID dla klientów
 
-    // Tworzenie klientów w pętli
+    // Główna pętla tworzenia klientów
     while (1) {
+        // Kontrola limitu procesów klientów
         if (*liczba_procesow >= MAX_PROCESSES) {
             printf("Osiągnięto maksymalną liczbę procesów klientów (%d). Czekam na wolne miejsce...\n", MAX_PROCESSES);
-            usleep(100000); // Odczekaj przed ponowną próbą
+            usleep(100000); // Oczekiwanie na zwolnienie miejsca
             continue;
         }
 
+        // Tworzenie nowego procesu klienta
         pid = fork();
-        if (pid == 0) { // Proces klienta
+        if (pid == 0) {
             char buf[10];
             sprintf(buf, "%d", id_klienta);
             execl("./klient", "./klient", buf, NULL);
             perror("Nie udało się uruchomić klienta");
             exit(1);
-        } else if (pid > 0) { // Proces rodzica
-            __sync_fetch_and_add(liczba_procesow, 1); // Zwiększ licznik procesów
+        } else if (pid > 0) {
+            __sync_fetch_and_add(liczba_procesow, 1); // Aktualizacja liczby procesów
         } else {
             perror("Fork nie powiódł się");
             exit(1);
         }
 
-        id_klienta++;
+        id_klienta++; // Inkrementacja ID klienta
 
         // Obsługa zakończonych procesów klientów
         int status;
         while (waitpid(-1, &status, WNOHANG) > 0) {
             printf("Proces klienta zakończył się.\n");
-            __sync_fetch_and_sub(liczba_procesow, 1); // Zmniejsz licznik procesów
+            __sync_fetch_and_sub(liczba_procesow, 1); // Aktualizacja liczby procesów
         }
 
-        usleep(100000); // Odczekaj przed utworzeniem kolejnego klienta
+        usleep(100000); // Oczekiwanie przed utworzeniem kolejnego klienta
     }
-
-    // Usunięcie pamięci współdzielonej
-    shmctl(shm_processes_id, IPC_RMID, NULL);
-    shmctl(shm_id, IPC_RMID, NULL);
-    shmctl(shm_klienci_id, IPC_RMID, NULL);
-    shmctl(shm_pozar_id, IPC_RMID, NULL);
-    shmctl(shm_awaria_id, IPC_RMID, NULL);
-
     return 0;
 }
