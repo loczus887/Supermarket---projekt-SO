@@ -101,7 +101,7 @@ int main() {
         }
 
         // Oznaczanie kas do zamknięcia, jeśli liczba klientów jest mała
-        for (int i = MAX_KASY - 1; i >= 0; i--) {
+        for (int i = MAX_KASY - 1; i >= 1; i--) {
             if (*liczba_klientow <= KLIENT_PER_KASA * (czynne_kasy - 1 - liczba_kas_do_zamkniecia) && kasy[i].czynna && czynne_kasy > MIN_CZYNNE_KASY && !kasy[i].do_zamkniecia) {
                 kasy[i].do_zamkniecia = 1; // Kasa oznaczona do zamknięcia
                 liczba_kas_do_zamkniecia++;
