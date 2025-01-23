@@ -1,17 +1,33 @@
 #include "supermarket.h"
 #include <signal.h>
-#include <fcntl.h>
 #include <unistd.h>
-#include <sys/types.h>
-#include <sys/stat.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/sem.h>
+#include <sys/shm.h>
 
 // Funkcja czyszcząca zasoby IPC (Shared Memory)
 void wyczysc_ipc() {
+    // Odczytanie semafora z pamięci współdzielonej
+    int shm_sem_id = shmget(SHM_PROCESSES_KEY, sizeof(int), 0600);
+    if (shm_sem_id < 0) {
+        perror("Nie udało się połączyć z pamięcią współdzieloną dla semafora");
+        exit(1);
+    }
+
+    int *sem_id_ptr = (int *)shmat(shm_sem_id, NULL, 0);
+    int sem_id = *sem_id_ptr;  // Odczytujemy semafor z pamięci współdzielonej
+    shmdt(sem_id_ptr);
+
+    // Usuwanie pamięci współdzielonej
     shmctl(shmget(SHM_KEY, MAX_KASY * sizeof(Kasa), 0600), IPC_RMID, NULL);
     shmctl(shmget(SHM_KEY + 1, sizeof(int), 0600), IPC_RMID, NULL);
     shmctl(shmget(SHM_POZAR_KEY, sizeof(int), 0600), IPC_RMID, NULL);
     shmctl(shmget(SHM_AWARIA_KEY, sizeof(int), 0600), IPC_RMID, NULL);
     shmctl(shmget(SHM_PROCESSES_KEY, sizeof(int), 0600), IPC_RMID, NULL);
+
+    // Usuwanie semafora
+    semctl(sem_id, 0, IPC_RMID);  // Usunięcie semafora
     printf("Strażak: Wyczyszczono zasoby IPC.\n");
 }
 
@@ -62,13 +78,9 @@ void zapisz_raport() {
 
 // Obsługa sygnału pożaru
 void strazak_obsluga_pozaru(int sig) {
+    // Flagi pożaru i awarii
     int shm_pozar_id = shmget(SHM_POZAR_KEY, sizeof(int), 0600);
-    if (shm_pozar_id < 0) {
-        perror("Nie udało się połączyć z pamięcią flagi pożaru");
-        exit(1);
-    }
     int *pozar = (int *)shmat(shm_pozar_id, NULL, 0);
-
     *pozar = 1; // Ustawienie flagi pożaru
     printf("Strażak: Pożar! Wszyscy klienci muszą opuścić sklep.\n");
     shmdt(pozar);
@@ -81,13 +93,9 @@ void strazak_obsluga_pozaru(int sig) {
 
 // Obsługa sygnału awarii prądu
 void strazak_obsluga_awarii(int sig) {
+    // Flagi pożaru i awarii
     int shm_awaria_id = shmget(SHM_AWARIA_KEY, sizeof(int), 0600);
-    if (shm_awaria_id < 0) {
-        perror("Nie udało się połączyć z pamięcią flagi awarii");
-        exit(1);
-    }
     int *awaria = (int *)shmat(shm_awaria_id, NULL, 0);
-
     *awaria = 1; // Ustawienie flagi awarii
     printf("Strażak: Awaria prądu! Wszyscy klienci muszą opuścić sklep.\n");
     shmdt(awaria);

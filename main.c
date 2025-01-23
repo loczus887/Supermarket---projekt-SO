@@ -106,7 +106,6 @@ int main() {
         // Obsługa zakończonych procesów klientów
         int status;
         while (waitpid(-1, &status, WNOHANG) > 0) {
-            printf("Proces klienta zakończył się.\n");
             __sync_fetch_and_sub(liczba_procesow, 1); // Aktualizacja liczby procesów
         }
 
