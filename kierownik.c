@@ -1,16 +1,19 @@
 #include "supermarket.h"
 #include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 // Flaga do oznaczenia pożaru
 volatile sig_atomic_t sygnal_pozar = 0;
 
-// Funkcja obsługi sygnału pożaru
+// **Funkcja obsługi sygnału pożaru**
 void obsluga_pozaru(int sig) {
     sygnal_pozar = 1; // Ustawienie flagi pożaru
 }
 
 int main() {
-    // Połączenie z pamięcią współdzieloną dla kas
+    // **Połączenie z pamięcią współdzieloną dla kas**
     int shm_id = shmget(SHM_KEY, MAX_KASY * sizeof(Kasa), 0600);
     if (shm_id < 0) {
         perror("Nie udało się połączyć z pamięcią współdzieloną");
@@ -18,7 +21,7 @@ int main() {
     }
     Kasa *kasy = (Kasa *)shmat(shm_id, NULL, 0);
 
-    // Połączenie z liczbą klientów
+    // **Połączenie z pamięcią współdzieloną dla liczby klientów**
     int shm_klienci_id = shmget(SHM_KEY + 1, sizeof(int), IPC_CREAT | 0600);
     if (shm_klienci_id < 0) {
         perror("Nie udało się połączyć z pamięcią współdzieloną dla liczby klientów");
@@ -26,7 +29,7 @@ int main() {
     }
     int *liczba_klientow = (int *)shmat(shm_klienci_id, NULL, 0);
 
-    // Połączenie z flagą pożaru
+    // **Połączenie z pamięcią współdzieloną dla flagi pożaru**
     int shm_pozar_id = shmget(SHM_POZAR_KEY, sizeof(int), 0600);
     if (shm_pozar_id < 0) {
         perror("Nie udało się połączyć z flagą pożaru");
@@ -34,46 +37,47 @@ int main() {
     }
     int *pozar = (int *)shmat(shm_pozar_id, NULL, 0);
 
-    // Połączenie z pamięcią flagi awarii
+    // **Połączenie z pamięcią współdzieloną dla flagi awarii**
     int shm_awaria_id = shmget(SHM_AWARIA_KEY, sizeof(int), IPC_CREAT | 0600);
     if (shm_awaria_id < 0) {
-        perror("Nie udało się utworzyć pamięci flagi awarii");
+        perror("Nie udało się połączyć z pamięcią współdzieloną dla flagi awarii");
         exit(1);
     }
     int *awaria = (int *)shmat(shm_awaria_id, NULL, 0);
-    *awaria = 0; // Początkowa wartość - brak awarii
 
-    // Ustawienie obsługi sygnału pożaru
+    // **Obsługa sygnału pożaru**
     signal(SIGINT, obsluga_pozaru);
 
     int liczba_kas_do_zamkniecia = 0; // Licznik kas oznaczonych do zamknięcia
 
+    // **Główna pętla zarządzania kasami**
     while (1) {
-        // Obsługa pożaru - zamknięcie wszystkich kas
+        // **Obsługa pożaru**
         if (*pozar || sygnal_pozar) {
+            printf("Kierownik: Pożar! Zamykam wszystkie kasy i ewakuuję klientów.\n");
             for (int i = 0; i < MAX_KASY; i++) {
                 if (kasy[i].czynna) {
                     printf("Kierownik: Zamykam kasę %d. Ewakuowani klienci z kolejki %d\n", i + 1, kasy[i].kolejka);
                 } else {
                     printf("Kierownik: Kasa %d była już zamknięta.\n", i + 1);
                 }
-                kasy[i].czynna = 0;
+                kasy[i].czynna = 0; // Zamknięcie kasy
             }
             exit(0);
         }
 
-        int czynne_kasy = 0; // Licznik czynnych kas
+        int czynne_kasy = 0; //Licznik czynnych kas
 
-        // Liczenie czynnych kas
+        // **Liczenie czynnych kas**
         for (int i = 0; i < MAX_KASY; i++) {
             if (kasy[i].czynna) {
                 czynne_kasy++;
             }
         }
 
-        printf("Kierownik: liczba_klientow = %d, czynne_kasy = %d\n", *liczba_klientow, czynne_kasy);
+        printf("Kierownik: Liczba klientów = %d, czynne kasy = %d\n", *liczba_klientow, czynne_kasy);
 
-        // Otwieranie nowych kas, jeśli liczba klientów na kasę przekracza próg
+        // **Otwieranie nowych kas, jeśli jest więcej klientów niż kasy mogą obsłużyć**
         while (*liczba_klientow > KLIENT_PER_KASA * (czynne_kasy - liczba_kas_do_zamkniecia) && czynne_kasy < MAX_KASY) {
             int otwarto = 0;
             for (int i = 0; i < MAX_KASY; i++) {
@@ -109,7 +113,7 @@ int main() {
             }
         }
 
-        // Zamknięcie kas oznaczonych do zamknięcia, które są puste
+        // **Zamykanie kas, jeśli liczba klientów jest za mała, pod warunkiem, że są puste**
         for (int i = 0; i < MAX_KASY; i++) {
             if (kasy[i].do_zamkniecia && kasy[i].kolejka == 0) {
                 kasy[i].czynna = 0; // Zamknięcie kasy

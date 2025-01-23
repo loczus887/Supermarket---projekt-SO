@@ -6,7 +6,7 @@
 #include <sys/sem.h>
 #include <sys/shm.h>
 
-// Funkcja czyszcząca zasoby IPC (Shared Memory)
+// **Funkcja czyszcząca zasoby IPC**
 void wyczysc_ipc() {
     // Odczytanie semafora z pamięci współdzielonej
     int shm_sem_id = shmget(SHM_PROCESSES_KEY, sizeof(int), 0600);
@@ -25,13 +25,12 @@ void wyczysc_ipc() {
     shmctl(shmget(SHM_POZAR_KEY, sizeof(int), 0600), IPC_RMID, NULL);
     shmctl(shmget(SHM_AWARIA_KEY, sizeof(int), 0600), IPC_RMID, NULL);
     shmctl(shmget(SHM_PROCESSES_KEY, sizeof(int), 0600), IPC_RMID, NULL);
-
     // Usuwanie semafora
-    semctl(sem_id, 0, IPC_RMID);  // Usunięcie semafora
+    semctl(sem_id, 0, IPC_RMID);  
     printf("Strażak: Wyczyszczono zasoby IPC.\n");
 }
 
-// Funkcja zapisująca raport o stanie kas
+// **Funkcja zapisująca raport o stanie kas**
 void zapisz_raport() {
     int fd = creat("raport_kasy.txt", S_IRUSR | S_IWUSR); // Tworzenie pliku raportu
     if (fd < 0) {
@@ -76,64 +75,73 @@ void zapisz_raport() {
     printf("Strażak: Raport zapisany do pliku 'raport_kasy.txt'.\n");
 }
 
-// Obsługa sygnału pożaru
+// **Obsługa sygnału pożaru**
 void strazak_obsluga_pozaru(int sig) {
-    // Flagi pożaru i awarii
+    // **Ustawienie flagi pożaru**
     int shm_pozar_id = shmget(SHM_POZAR_KEY, sizeof(int), 0600);
+    if (shm_pozar_id < 0) {
+        perror("Nie udało się połączyć z pamięcią współdzieloną dla flagi pożaru");
+        exit(1);
+    }
     int *pozar = (int *)shmat(shm_pozar_id, NULL, 0);
     *pozar = 1; // Ustawienie flagi pożaru
-    printf("Strażak: Pożar! Wszyscy klienci muszą opuścić sklep.\n");
     shmdt(pozar);
 
-    // Czyszczenie zasobów IPC i zapis raportu
+    printf("Strażak: Pożar! Wszyscy klienci muszą opuścić sklep.\n");
+
+    // **Zapis raportu i czyszczenie zasobów**
     zapisz_raport();
     wyczysc_ipc();
     exit(0);
 }
 
-// Obsługa sygnału awarii prądu
+// **Obsługa sygnału awarii prądu**
 void strazak_obsluga_awarii(int sig) {
-    // Flagi pożaru i awarii
+    // **Ustawienie flagi awarii**
     int shm_awaria_id = shmget(SHM_AWARIA_KEY, sizeof(int), 0600);
+    if (shm_awaria_id < 0) {
+        perror("Nie udało się połączyć z pamięcią współdzieloną dla flagi awarii");
+        exit(1);
+    }
     int *awaria = (int *)shmat(shm_awaria_id, NULL, 0);
     *awaria = 1; // Ustawienie flagi awarii
     printf("Strażak: Awaria prądu! Wszyscy klienci muszą opuścić sklep.\n");
     shmdt(awaria);
 
-    // Czyszczenie zasobów IPC i zapis raportu
+    // **Zapis raportu i czyszczenie zasobów**
     zapisz_raport();
     wyczysc_ipc();
     exit(0);
 }
 
 int main() {
-    // Inicjalizacja pamięci dla flagi pożaru
+    // **Inicjalizacja pamięci dla flagi pożaru**
     int shm_pozar_id = shmget(SHM_POZAR_KEY, sizeof(int), IPC_CREAT | 0600);
     if (shm_pozar_id < 0) {
-        perror("Nie udało się utworzyć pamięci flagi pożaru");
+        perror("Nie udało się utworzyć pamięci dla flagi pożaru");
         exit(1);
     }
     int *pozar = (int *)shmat(shm_pozar_id, NULL, 0);
-    *pozar = 0;
+    *pozar = 0; // Flaga pożaru ustawiona na brak pożaru
 
-    // Inicjalizacja pamięci dla flagi awarii
+    // **Inicjalizacja pamięci dla flagi awarii**
     int shm_awaria_id = shmget(SHM_AWARIA_KEY, sizeof(int), IPC_CREAT | 0600);
     if (shm_awaria_id < 0) {
-        perror("Nie udało się utworzyć pamięci flagi awarii");
+        perror("Nie udało się utworzyć pamięci dla flagi awarii");
         exit(1);
     }
     int *awaria = (int *)shmat(shm_awaria_id, NULL, 0);
-    *awaria = 0;
+    *awaria = 0; // Flaga awarii ustawiona na brak awarii
 
-    // Ustawienie obsługi sygnałów dla pożaru i awarii prądu
-    signal(SIGINT, strazak_obsluga_pozaru); // CTRL+C - pożar
-    signal(SIGQUIT, strazak_obsluga_awarii); // CTRL+\ - awaria prądu
+    // **Ustawienie obsługi sygnałów**
+    signal(SIGINT, strazak_obsluga_pozaru);  // CTRL+C - Pożar
+    signal(SIGQUIT, strazak_obsluga_awarii); // CTRL+\ - Awaria prądu
 
     printf("Strażak: Wciśnij CTRL+C dla pożaru lub CTRL+\\ dla awarii prądu.\n");
 
-    // Główna pętla oczekiwania na sygnały
+    // **Główna pętla oczekiwania na sygnały**
     while (1) {
-        pause(); // Oczekiwanie na sygnał
+        pause(); // Czekanie na sygnały
     }
 
     return 0;

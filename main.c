@@ -6,24 +6,24 @@
 int main() {
     pid_t pid;
 
-    // Połączenie z pamięcią współdzieloną dla kas
+    // **Inicjalizacja pamięci współdzielonej dla kas**
     int shm_id = shmget(SHM_KEY, MAX_KASY * sizeof(Kasa), IPC_CREAT | 0600);
     if (shm_id < 0) {
         perror("Nie udało się utworzyć pamięci współdzielonej dla kas");
         exit(1);
     }
 
-    // Mapowanie pamięci współdzielonej do przestrzeni adresowej procesu
+    // Mapowanie pamięci współdzielonej
     Kasa *kasy = (Kasa *)shmat(shm_id, NULL, 0);
 
-    // Inicjalizacja kas: ustawienie początkowych wartości
+    // **Inicjalizacja stanu kas**
     for (int i = 0; i < MAX_KASY; i++) {
-        kasy[i].czynna = (i < MIN_CZYNNE_KASY) ? 1 : 0; // Ustawienie minimalnej liczby czynnych kas
+        kasy[i].czynna = (i < MIN_CZYNNE_KASY) ? 1 : 0; // Minimalna liczba czynnych kas
         kasy[i].kolejka = 0;                            // Początkowa długość kolejki
         kasy[i].obsluzonych_klientow = 0;               // Początkowa liczba obsłużonych klientów
     }
 
-    // Tworzenie pamięci współdzielonej dla liczby klientów
+    // **Inicjalizacja pamięci współdzielonej dla liczby klientów**
     int shm_klienci_id = shmget(SHM_KEY + 1, sizeof(int), IPC_CREAT | 0600);
     if (shm_klienci_id < 0) {
         perror("Nie udało się utworzyć pamięci współdzielonej dla liczby klientów");
@@ -32,7 +32,7 @@ int main() {
     int *liczba_klientow = (int *)shmat(shm_klienci_id, NULL, 0);
     *liczba_klientow = 0; // Początkowa liczba klientów
 
-    // Analogiczne tworzenie i inicjalizacja pamięci dla liczby procesów
+    // **Inicjalizacja pamięci współdzielonej dla liczby procesów**
     int shm_processes_id = shmget(SHM_PROCESSES_KEY, sizeof(int), IPC_CREAT | 0600);
     if (shm_processes_id < 0) {
         perror("Nie udało się utworzyć pamięci współdzielonej dla liczby procesów");
@@ -41,7 +41,7 @@ int main() {
     int *liczba_procesow = (int *)shmat(shm_processes_id, NULL, 0);
     *liczba_procesow = 0; // Początkowa liczba procesów
 
-    // Analogiczne tworzenie pamięci współdzielonej dla flagi pożaru
+    // **Inicjalizacja pamięci współdzielonej dla flag pożaru i awarii**
     int shm_pozar_id = shmget(SHM_POZAR_KEY, sizeof(int), IPC_CREAT | 0600);
     if (shm_pozar_id < 0) {
         perror("Nie udało się utworzyć pamięci współdzielonej dla flagi pożaru");
@@ -50,7 +50,6 @@ int main() {
     int *pozar = (int *)shmat(shm_pozar_id, NULL, 0);
     *pozar = 0; // Początkowa wartość flagi pożaru
 
-    // Analogiczne tworzenie pamięci współdzielonej dla flagi awarii
     int shm_awaria_id = shmget(SHM_AWARIA_KEY, sizeof(int), IPC_CREAT | 0600);
     if (shm_awaria_id < 0) {
         perror("Nie udało się utworzyć pamięci współdzielonej dla flagi awarii");
@@ -59,7 +58,7 @@ int main() {
     int *awaria = (int *)shmat(shm_awaria_id, NULL, 0);
     *awaria = 0; // Początkowa wartość flagi awarii
 
-    // Tworzenie procesu dla kierownika
+    // **Tworzenie procesu dla kierownika**
     pid = fork();
     if (pid == 0) {
         execl("./kierownik", "./kierownik", NULL);
@@ -67,7 +66,7 @@ int main() {
         exit(1);
     }
 
-    // Tworzenie procesu dla strażaka
+    // **Tworzenie procesu dla strażaka**
     pid = fork();
     if (pid == 0) {
         execl("./strazak", "./strazak", NULL);
@@ -77,7 +76,7 @@ int main() {
 
     int id_klienta = 1; // ID dla klientów
 
-    // Główna pętla tworzenia klientów
+    // **Główna pętla tworzenia klientów**
     while (1) {
         // Kontrola limitu procesów klientów
         if (*liczba_procesow >= MAX_PROCESSES) {
